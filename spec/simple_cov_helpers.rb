@@ -55,7 +55,7 @@ class SimpleCovHelpers
     merged = SimpleCov::RawCoverage.merge_results(*results.map(&:original_result))
     result = SimpleCov::Result.new(merged)
     result.command_name = 'RSpec'
-    result.format!
+    SimpleCov::ResultMerger.store_result(result)
     CodeClimate::TestReporter.run(result.to_hash)
   end
 end
