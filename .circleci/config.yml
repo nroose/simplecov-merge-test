@@ -52,6 +52,9 @@ jobs:
       - store_artifacts:
           path: log
 
+      - store_artifacts:
+          path: coverage
+
       - run:
           name: Stash Coverage Results
           command: |
