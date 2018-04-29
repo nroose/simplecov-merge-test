@@ -8,7 +8,7 @@ class SimpleCovHelpers
     def report_coverage(base_dir: './coverage_results')
       puts "report_coverage base_dir: #{base_dir}"
       setup_coverage
-      SimpleCov.start 'rails'
+      # SimpleCov.start 'rails'
       new(base_dir: base_dir).merge_results
     end
 
