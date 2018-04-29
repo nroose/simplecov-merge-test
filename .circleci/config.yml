@@ -77,7 +77,7 @@ jobs:
       - checkout
       - run:
           name: Setup
-          command: cp .env-example .env && sudo apt-get install cmake && cp .circleci/database.yml config/database.yml
+          command: cp .circleci/database.yml config/database.yml
 
       - restore_cache:
           keys:
