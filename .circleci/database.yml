@@ -1,0 +1,15 @@
+defaults: &defaults
+  adapter: mysql2
+  collation: utf8_general_ci
+  username: root
+  password:
+  host: <%= ENV['DB_HOST'] || '127.0.0.1' %>
+  strict: false
+  reconnect: true
+  database: circle_test
+
+test:
+  <<: *defaults
+
+development:
+  <<: *defaults

@@ -1,0 +1,127 @@
+version: 2
+jobs:
+  rspec:
+    parallelism: 2
+    docker:
+      - image: circleci/ruby:2.2-node-browsers
+      - image: circleci/mysql:5.6-ram
+        environment:
+          - MYSQL_ALLOW_EMPTY_PASSWORD=true
+          - MYSQL_DATABASE=circle_test
+          - MYSQL_HOST=127.0.0.1
+          - MYSQL_ROOT_HOST=%
+          - MYSQL_USER=root
+    steps:
+      - checkout
+
+      - run:
+          name: Setup
+          command: cp .circleci/database.yml config/database.yml
+
+      - restore_cache:
+          keys:
+            - gem-cache-{{ arch }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-{{ arch }}-{{ .Branch }}
+            - gem-cache
+
+      - run:
+          name: Bundle
+          command: bundle check --path vendor/bundle || bundle install --path vendor/bundle
+
+      - save_cache:
+          key: gem-cache-{{ arch }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      - run:
+          name: Wait for Database Container
+          command: dockerize -wait tcp://localhost:3306 -timeout 1m
+
+      - run:
+          name: Database Setup
+          command: RAILS_ENV=test bundle exec rake --trace db:migrate
+
+      - run:
+          name: RSpec
+          command: |
+            bundle exec rspec -p 5 -f progress -f RspecJunitFormatter -o rspec/rspec.xml $(circleci tests glob "spec/**/*_spec.rb" | circleci tests split --split-by=timings)
+
+      - store_test_results:
+          path: rspec
+
+      - store_artifacts:
+          path: log
+
+      - run:
+          name: Stash Coverage Results
+          command: |
+            mkdir coverage_results
+            cp -R coverage/.resultset.json coverage_results/.resultset-rspec-${CIRCLE_NODE_INDEX}.json
+
+      - persist_to_workspace:
+          root: .
+          paths:
+            - coverage_results
+
+  coverage:
+    docker:
+      - image: circleci/ruby:2.2-node-browsers
+      - image: circleci/mysql:5.6-ram
+        environment:
+          - MYSQL_ALLOW_EMPTY_PASSWORD=true
+          - MYSQL_DATABASE=circle_test
+          - MYSQL_HOST=127.0.0.1
+          - MYSQL_ROOT_HOST=%
+          - MYSQL_USER=root
+    steps:
+      - checkout
+      - run:
+          name: Setup
+          command: cp .env-example .env && sudo apt-get install cmake && cp .circleci/database.yml config/database.yml
+
+      - restore_cache:
+          keys:
+            - gem-cache-{{ arch }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+            - gem-cache-{{ arch }}-{{ .Branch }}
+            - gem-cache
+
+      - run:
+          name: Bundle
+          command: bundle check --path vendor/bundle || bundle install --path vendor/bundle
+
+      - save_cache:
+          key: gem-cache-{{ arch }}-{{ .Branch }}-{{ checksum "Gemfile.lock" }}
+          paths:
+            - vendor/bundle
+
+      - run:
+          name: Wait for Database Container
+          command: dockerize -wait tcp://localhost:3306 -timeout 1m
+
+      - run:
+          name: Database Setup
+          command: RAILS_ENV=test bundle exec rake --trace db:migrate
+
+      - attach_workspace:
+          at: .
+
+      - run:
+          name: ls_coverage_results
+          command: ls coverage_results
+
+      - run:
+          name: Merge and check coverage
+          command: |
+            SKIP_COVERAGE_CHECK='true' RUN_COVERAGE='true' bundle exec rake simplecov:report_coverage
+
+      - store_artifacts:
+          path: coverage
+
+workflows:
+  version: 2
+  test:
+    jobs:
+      - rspec
+      - coverage:
+          requires:
+            - rspec
